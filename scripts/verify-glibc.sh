@@ -27,7 +27,7 @@ docker run --rm -v "$PWD:/src" -v "$SCRIPT_DIR:/scripts" -w /src ubuntu:18.04 ba
   too_new() { [ -n "$1" ] && [ "$(printf "%s\n%s\n" "$1" "$2" | sort -V | tail -1)" != "$2" ]; }
   for bin in /tmp/test_pdfium /tmp/libtest_pdfium.so; do
     objdump -T "$bin" > /tmp/dynsyms
-    max() { grep -oP "\($1\K[0-9.]+" /tmp/dynsyms | sort -uV | tail -1; }
+    max() { grep -oP "\s$1\K[0-9.]+" /tmp/dynsyms | sort -uV | tail -1; }
     glibc=$(max GLIBC_); glibcxx=$(max GLIBCXX_)
     echo "$bin: highest GLIBC_ ${glibc:-none}, highest GLIBCXX_ ${glibcxx:-none}"
     if too_new "$glibc" 2.27; then
