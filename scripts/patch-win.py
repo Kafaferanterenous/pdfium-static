@@ -5,6 +5,7 @@ Run from the pdfium source root (pdfium-src/pdfium/).
 """
 
 import pathlib
+import re
 import sys
 
 
@@ -32,3 +33,26 @@ patch(
     "#endif\n"
     "\n",
 )
+
+
+# Since chromium/8082, the build asks for Windows SDK 10.0.28000.0. GitHub
+# runners only have its binaries, not its headers, so use the newest SDK whose
+# headers are installed.
+sdk_include = pathlib.Path(r"C:\Program Files (x86)\Windows Kits\10\Include")
+sdk_version = max(
+    (d.name for d in sdk_include.iterdir() if (d / "um").is_dir()),
+    key=lambda v: tuple(int(x) for x in v.split(".")),
+)
+for path in ("build/vs_toolchain.py", "build/toolchain/win/setup_toolchain.py"):
+    p = pathlib.Path(path)
+    src, n = re.subn(
+        r"^SDK_VERSION = '[^']+'$",
+        f"SDK_VERSION = '{sdk_version}'",
+        p.read_text(),
+        flags=re.M,
+    )
+    if n != 1:
+        print(f"ERROR: SDK_VERSION not found in {path}")
+        sys.exit(1)
+    p.write_text(src)
+    print(f"Patched: {path} (SDK {sdk_version})")
