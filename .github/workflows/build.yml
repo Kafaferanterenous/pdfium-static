@@ -37,7 +37,7 @@ jobs:
             # Bundle libc++ and build against glibc 2.27, so the library links
             # on Ubuntu 18.04 and RHEL 8 hosts.
             custom_libcxx: true
-            extra_args: 'target_sysroot = "//build/linux/ubuntu_bionic_amd64-sysroot"'
+            extra_args: 'target_sysroot = "//build/linux/ubuntu_bionic_amd64-sysroot" use_glib = false'
           - os: windows-2025
             target_os: win
             target_cpu: x64
