@@ -15,5 +15,9 @@ docker run --rm -v "$OUT:/out" ubuntu:18.04 bash -euc '
   cp -a /usr/include /out/usr/
   cp -a /usr/lib/x86_64-linux-gnu /usr/lib/gcc /out/usr/lib/
   cp -a /lib/x86_64-linux-gnu /out/lib/
+  # Absolute symlinks would point to the host libraries, not the sysroot ones.
+  find /out -type l -lname "/*" | while read -r link; do
+    ln -sfn "$(realpath -m --relative-to="$(dirname "$link")" "/out$(readlink "$link")")" "$link"
+  done
+  echo "Sysroot ready (glibc $(ldd --version | head -1 | grep -oE "[0-9.]+$"))"
 '
-echo "Sysroot ready in $OUT (glibc $(grep -m1 -oP "__GLIBC_MINOR__\s+\K\d+" "$OUT/usr/include/features.h" | sed "s/^/2./"))"
