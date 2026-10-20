@@ -56,3 +56,11 @@ for path in ("build/vs_toolchain.py", "build/toolchain/win/setup_toolchain.py"):
         sys.exit(1)
     p.write_text(src)
     print(f"Patched: {path} (SDK {sdk_version})")
+
+# NTDDI_WIN11_BR only exists in SDK 28000. NTDDI_WIN11_GE is the newest value
+# SDK 26100 knows.
+patch(
+    "build/config/win/BUILD.gn",
+    '"NTDDI_VERSION=NTDDI_WIN11_BR"',
+    '"NTDDI_VERSION=NTDDI_WIN11_GE"',
+)
