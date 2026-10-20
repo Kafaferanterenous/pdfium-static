@@ -167,8 +167,25 @@ jobs:
           name: ${{ matrix.artifact_name }}
           path: pdfium-src/pdfium/${{ matrix.lib_file }}
 
-  release:
+  # Windows runners cannot run Linux containers, so this check runs here.
+  verify-windows-xwin:
     needs: build
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Download Windows library
+        uses: actions/download-artifact@v8
+        with:
+          name: pdfium-windows-x64
+          path: win
+
+      - name: Link into a DLL with the cargo-xwin CRT
+        run: scripts/verify-xwin.sh win/pdfium.lib
+
+  release:
+    needs: [build, verify-windows-xwin]
     if: inputs.release
     runs-on: ubuntu-latest
     permissions:

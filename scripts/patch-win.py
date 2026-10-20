@@ -59,8 +59,10 @@ for path in ("build/vs_toolchain.py", "build/toolchain/win/setup_toolchain.py"):
 
 # NTDDI_WIN11_BR only exists in SDK 28000. NTDDI_WIN11_GE is the newest value
 # SDK 26100 knows.
+# The runner's MSVC STL calls vectorised helpers (__std_rotate, ...) that older
+# CRTs, like the one cargo-xwin uses, do not have. Turn them off.
 patch(
     "build/config/win/BUILD.gn",
-    '"NTDDI_VERSION=NTDDI_WIN11_BR"',
-    '"NTDDI_VERSION=NTDDI_WIN11_GE"',
+    '"NTDDI_VERSION=NTDDI_WIN11_BR",',
+    '"NTDDI_VERSION=NTDDI_WIN11_GE",\n    "_USE_STD_VECTOR_ALGORITHMS=0",',
 )
