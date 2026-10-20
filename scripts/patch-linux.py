@@ -25,3 +25,17 @@ patch(
     'cflags += [ "-Wa,--crel,--allow-experimental-crel" ]',
     "",
 )
+
+# Chromium links libc++ into executables and shared libraries only. Add it to
+# the pdfium target, so the complete static library contains it.
+patch(
+    "buildtools/third_party/libc++/BUILD.gn",
+    'visibility = [\n    "//build/config:common_deps",\n',
+    'visibility = [\n    "//build/config:common_deps",\n    "//:pdfium",\n',
+)
+patch(
+    "BUILD.gn",
+    '  public_deps = [\n    ":pdfium_public_headers_impl",\n',
+    '  deps += [ "//buildtools/third_party/libc++" ]\n\n'
+    '  public_deps = [\n    ":pdfium_public_headers_impl",\n',
+)
