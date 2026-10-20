@@ -7,6 +7,10 @@ on:
         description: 'PDFium chromium branch number'
         required: true
         default: '7734'
+      release:
+        description: 'Publish a GitHub release when every build passes'
+        type: boolean
+        default: true
 
 env:
   DEPOT_TOOLS_WIN_TOOLCHAIN: 0
@@ -30,7 +34,10 @@ jobs:
             target_cpu: x64
             artifact_name: libpdfium-linux-x64
             lib_file: out/Default/obj/libpdfium.a
-            extra_args: "use_sysroot = false"
+            # Bundle libc++ and build against glibc 2.27, so the library links
+            # on Ubuntu 18.04 and RHEL 8 hosts.
+            custom_libcxx: true
+            extra_args: 'target_sysroot = "//build/linux/ubuntu_bionic_amd64-sysroot"'
           - os: windows-2025
             target_os: win
             target_cpu: x64
@@ -89,10 +96,14 @@ jobs:
           gclient config --unmanaged https://pdfium.googlesource.com/pdfium.git
           gclient sync -r origin/chromium/${{ env.PDFIUM_BRANCH }} --no-history --shallow
 
-      - name: Install sysroot (Linux)
+      - name: Build glibc 2.27 sysroot (Linux)
+        if: matrix.target_os == 'linux'
+        run: scripts/make-sysroot.sh pdfium-src/pdfium/build/linux/ubuntu_bionic_amd64-sysroot
+
+      - name: Patch PDFium for Linux
         if: matrix.target_os == 'linux'
         working-directory: pdfium-src/pdfium
-        run: ./build/install-build-deps.sh --no-prompt --unsupported
+        run: python3 $GITHUB_WORKSPACE/scripts/patch-linux.py
 
       - name: Patch Windows resource compiler
         if: matrix.target_os == 'win'
@@ -123,7 +134,7 @@ jobs:
           pdf_enable_xfa = false
           pdf_enable_v8 = false
           pdf_use_partition_alloc = false
-          use_custom_libcxx = false
+          use_custom_libcxx = ${{ matrix.custom_libcxx || false }}
           treat_warnings_as_errors = false
           clang_use_chrome_plugins = false
           symbol_level = 0
@@ -140,6 +151,11 @@ jobs:
         shell: bash
         run: $GITHUB_WORKSPACE/scripts/verify-native.sh "pdfium-src/pdfium/${{ matrix.lib_file }}" "${{ matrix.target_os }}"
 
+      - name: Test on Ubuntu 18.04 (Linux)
+        if: matrix.target_os == 'linux'
+        working-directory: pdfium-src/pdfium
+        run: $GITHUB_WORKSPACE/scripts/verify-glibc.sh ${{ matrix.lib_file }}
+
       - name: Test WASM with emcc
         if: matrix.target_os == 'emscripten'
         working-directory: pdfium-src/pdfium
@@ -153,6 +169,7 @@ jobs:
 
   release:
     needs: build
+    if: inputs.release
     runs-on: ubuntu-latest
     permissions:
       contents: write
