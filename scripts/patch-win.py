@@ -2,6 +2,9 @@
 """Patch PDFium source tree for the Windows static build.
 
 Run from the pdfium source root (pdfium-src/pdfium/).
+
+Fork note: every patch is best-effort. Older chromium branches do not contain
+the newer patterns, and a missing pattern must not abort the build.
 """
 
 import pathlib
@@ -9,12 +12,21 @@ import re
 import sys
 
 
-def patch(path, old, new):
+def patch(path, old, new, required=False):
     p = pathlib.Path(path)
+    if not p.exists():
+        if required:
+            print(f"ERROR: missing file {path}")
+            sys.exit(1)
+        print(f"Skip (no file): {path}")
+        return
     src = p.read_text()
     if old not in src:
-        print(f"ERROR: pattern not found in {path}")
-        sys.exit(1)
+        if required:
+            print(f"ERROR: pattern not found in {path}")
+            sys.exit(1)
+        print(f"Skip (no match): {path}")
+        return
     p.write_text(src.replace(old, new, 1))
     print(f"Patched: {path}")
 
@@ -35,32 +47,34 @@ patch(
 )
 
 
-# Since chromium/8082, the build asks for Windows SDK 10.0.28000.0. GitHub
-# runners only have its binaries, not its headers, so use the newest SDK whose
-# headers are installed.
+# Newer branches ask for a Windows SDK the GitHub runners do not install
+# headers for. Fall back to the newest SDK whose headers are present.
 sdk_include = pathlib.Path(r"C:\Program Files (x86)\Windows Kits\10\Include")
-sdk_version = max(
-    (d.name for d in sdk_include.iterdir() if (d / "um").is_dir()),
-    key=lambda v: tuple(int(x) for x in v.split(".")),
-)
-for path in ("build/vs_toolchain.py", "build/toolchain/win/setup_toolchain.py"):
-    p = pathlib.Path(path)
-    src, n = re.subn(
-        r"^SDK_VERSION = '[^']+'$",
-        f"SDK_VERSION = '{sdk_version}'",
-        p.read_text(),
-        flags=re.M,
+if sdk_include.is_dir():
+    sdk_version = max(
+        (d.name for d in sdk_include.iterdir() if (d / "um").is_dir()),
+        key=lambda v: tuple(int(x) for x in v.split(".")),
     )
-    if n != 1:
-        print(f"ERROR: SDK_VERSION not found in {path}")
-        sys.exit(1)
-    p.write_text(src)
-    print(f"Patched: {path} (SDK {sdk_version})")
+    for path in ("build/vs_toolchain.py", "build/toolchain/win/setup_toolchain.py"):
+        p = pathlib.Path(path)
+        if not p.exists():
+            continue
+        src, n = re.subn(
+            r"^SDK_VERSION = '[^']+'$",
+            f"SDK_VERSION = '{sdk_version}'",
+            p.read_text(),
+            flags=re.M,
+        )
+        if n:
+            p.write_text(src)
+            print(f"Patched: {path} (SDK {sdk_version})")
+        else:
+            print(f"Skip (no SDK_VERSION): {path}")
 
 # NTDDI_WIN11_BR only exists in SDK 28000. NTDDI_WIN11_GE is the newest value
-# SDK 26100 knows.
+# SDK 26100 knows. Older branches already use GE, so this is a no-op there.
 # The runner's MSVC STL calls vectorised helpers (__std_rotate, ...) that older
-# CRTs, like the one cargo-xwin uses, do not have. Turn them off.
+# CRTs do not have. Turn them off.
 patch(
     "build/config/win/BUILD.gn",
     '"NTDDI_VERSION=NTDDI_WIN11_BR",',
